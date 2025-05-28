@@ -9,28 +9,34 @@ import (
 	"log"
 	"net/http"
 	"time"
+	"os"
+	"github.com/joho/godotenv"
 )
 
 const port = 8080
 
 func main() {
 	// set application config
+	var err error
+	err = godotenv.Load()
+	if err != nil {
+		log.Println("Failed to load .env file. Using default values")
+	}
 	var app api.Application
 
 	// read from command line
-	flag.StringVar(&app.DSN, "dsn", "host=localhost port=5432 user=jpassano password=jP1732 dbname=autserver sslmode=disable timezone=UTC connect_timeout=5", "Postgres connection string")
-	flag.StringVar(&app.JWTSecret, "jwt-secret", "verysecret", "signing secret")
-	flag.StringVar(&app.JWTIssuer, "jwt-issuer", "example.com", "signing issuer")
-	flag.StringVar(&app.JWTAudience, "jwt-audience", "example.com", "signing audience")
-	flag.StringVar(&app.CookieDomain, "cookie-domain", "localhost", "cookie domain")
-	flag.StringVar(&app.Domain, "domain", "example.com", "domain")
+	flag.StringVar(&app.DSN, "dsn", getEnv("DSN", "host=localhost port=5432 user=postgres password=postgres dbname=myserver sslmode=disable timezone=UTC connect_timeout=5"), "Postgres connection string")
+	flag.StringVar(&app.JWTSecret, "jwt-secret", getEnv("JWT_SECRET", "verysecret"), "signing secret")
+	flag.StringVar(&app.JWTIssuer, "jwt-issuer", getEnv("JWT_ISSUER", "example.com"), "signing issuer")
+	flag.StringVar(&app.JWTAudience, "jwt-audience", getEnv("JWT_AUDIENCE", "example.com"), "signing audience")
+	flag.StringVar(&app.CookieDomain, "cookie-domain", getEnv("COOKIE_DOMAIN", "localhost"), "cookie domain")
+	flag.StringVar(&app.Domain, "domain", getEnv("DOMAIN", "example.com"), "domain")
 
 	flag.Parse()
 	// Initialize the database connection
 	repo := &dbrepo.PostgresDBRepo{}
 	app.DB = repo
 
-	var err error
 	db, err := app.DB.ConnectToDB(app.DSN)
 	if err != nil {
 		log.Fatalf("Failed to initialize the database: %v", err)
@@ -67,4 +73,11 @@ func main() {
 
 	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", port), handler))
 
+}
+
+func getEnv(key, defaultValue string) string {
+	if value, exists := os.LookupEnv(key); exists {
+		return value
+	}
+	return defaultValue
 }
