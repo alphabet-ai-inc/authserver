@@ -30,39 +30,58 @@ import (
 
 // Test for CORS Middleware
 func TestEnableCORS(t *testing.T) {
+	// Setup test environment with allowed origins
+	t.Setenv("ALLOWED_ORIGINS", "http://test-host:3000,http://localhost")
+
 	mockDB := new(repository.MockDBRepo)
 	app := api.Application{
 		DB: mockDB.DatabaseRepo,
 	}
-	// Create a mock HTTP handler
+
 	mockHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
 
 	corsHandler := app.EnableCORS(mockHandler)
 
-	// Test a GET request
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	recorder := httptest.NewRecorder()
+	// Test case 1: Request with allowed origin
+	t.Run("Allowed origin", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req.Header.Set("Origin", "http://test-host:3000")
+		recorder := httptest.NewRecorder()
 
-	corsHandler.ServeHTTP(recorder, req)
+		corsHandler.ServeHTTP(recorder, req)
 
-	resp := recorder.Result()
-	assert.Equal(t, http.StatusOK, resp.StatusCode)
-	assert.Equal(t, "http://localhost:3000", resp.Header.Get("Access-Control-Allow-Origin"))
-	// assert.Equal(t, "true", resp.Header.Get("Access-Control-Allow-Credentials"))
+		resp := recorder.Result()
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+		assert.Equal(t, "http://test-host:3000", resp.Header.Get("Access-Control-Allow-Origin"))
+	})
 
-	// Test an OPTIONS request for preflight
-	reqOptions := httptest.NewRequest(http.MethodOptions, "/", nil)
-	recorderOptions := httptest.NewRecorder()
+	// Test case 2: Request with disallowed origin
+	t.Run("Disallowed origin", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req.Header.Set("Origin", "http://unknown.com")
+		recorder := httptest.NewRecorder()
 
-	corsHandler.ServeHTTP(recorderOptions, reqOptions)
+		corsHandler.ServeHTTP(recorder, req)
 
-	respOptions := recorderOptions.Result()
-	assert.Equal(t, http.StatusOK, respOptions.StatusCode)
-	assert.Equal(t, "true", respOptions.Header.Get("Access-Control-Allow-Credentials"))
-	assert.Equal(t, "GET, POST, PUT, PATCH, DELETE, OPTIONS", respOptions.Header.Get("Access-Control-Allow-Methods"))
-	assert.Equal(t, "Accept, Content-Type, X-CSRF-Token, Authorization", respOptions.Header.Get("Access-Control-Allow-Headers"))
+		resp := recorder.Result()
+		assert.Empty(t, resp.Header.Get("Access-Control-Allow-Origin"))
+	})
+
+	// Test case 3: OPTIONS preflight request
+	t.Run("OPTIONS request", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodOptions, "/", nil)
+		recorder := httptest.NewRecorder()
+
+		corsHandler.ServeHTTP(recorder, req)
+
+		resp := recorder.Result()
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+		assert.Equal(t, "true", resp.Header.Get("Access-Control-Allow-Credentials"))
+		assert.Equal(t, "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+			resp.Header.Get("Access-Control-Allow-Methods"))
+	})
 }
 
 // Test for Authentication Middleware

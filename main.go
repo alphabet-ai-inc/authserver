@@ -43,7 +43,7 @@ func main() {
 			log.Fatal("Error loading .env file. It is not readable.")
 		}
 	}
-	// read from command line
+	// Load configuration from environment variables
 	app.DSN = os.Getenv("DSN")
 	app.JWTSecret = os.Getenv("JWT_SECRET")
 

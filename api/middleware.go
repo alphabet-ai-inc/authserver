@@ -1,16 +1,31 @@
 package api
 
-import "net/http"
+import (
+	"log"
+	"net/http"
+	"os"
+	"strings"
+)
 
 func (app *Application) EnableCORS(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
-        origin := r.Header.Get("Origin")
-        if origin == "http://localhost" || origin == "http://localhost:3000" {
-            w.Header().Set("Access-Control-Allow-Origin", origin)
-            w.Header().Set("Vary", "Origin")
-        }
+		origin := r.Header.Get("Origin")
+		allowedOrigins := os.Getenv("ALLOWED_ORIGINS")
 
+		// Check origin in allowedOrigins
+		found := false
+
+		for _, allowedOrigin := range strings.Split(allowedOrigins, ",") {
+			if origin == strings.TrimSpace(allowedOrigin) {
+				w.Header().Set("Access-Control-Allow-Origin", origin)
+				w.Header().Set("Vary", "Origin")
+				found = true
+				break
+			}
+		}
+		if !found && origin != "" {
+			log.Printf("Origin not allowed: %s (Allowed: %s)", origin, allowedOrigins)
+		}
 		w.Header().Set("Access-Control-Allow-Credentials", "true")
 		// for production, needed to change localhost here and move the following line
 		// w.Header().Set("Access-Control-Allow-Credentials", "true")
